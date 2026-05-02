@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>AI体检报告解读</title>
+  <script src="https://modao.cc/agent-py/static/source/js/tailwindcss.js"></script>
+  <script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.js"></script>
+  <script src="https://modao.cc/agent-py/static/source/js/echarts.min.js"></script>
+  <style>
+    :root {
+      --medical-green: #059669;
+      --medical-blue: #6366f1;
+      --medical-light-green: #10b981;
+      --warning-orange: #f59e0b;
+      --danger-red: #dc2626;
+      --bg-light: #f8f9fa;
+      --bg-card: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .scroll-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab-active {
+      color: var(--medical-green);
+      position: relative;
+    }
+
+    .tab-active::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 24px;
+      height: 3px;
+      background: var(--medical-green);
+      border-radius: 99px;
+    }
+
+    .medical-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+
+    .status-critical {
+      background: linear-gradient(135deg, #fff5f5 0%, #ffe5e5 100%);
+      border: 1px solid #fecdd3;
+    }
+
+    .status-warning {
+      background: linear-gradient(135deg, #fffaf0 0%, #fff3e0 100%);
+      border: 1px solid #fed7aa;
+    }
+
+    .status-normal {
+      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+      border: 1px solid #bbf7d0;
+    }
+
+    .health-gradient {
+      background: linear-gradient(135deg, var(--medical-green) 0%, var(--medical-light-green) 100%);
+    }
+
+    .ai-medical-glow {
+      box-shadow: 0 0 16px rgba(46, 204, 113, 0.1);
+    }
+
+    .modal-overlay {
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal-content {
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .page-content {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      min-height: 0;
+    }
+
+    .page-content * {
+      max-width: 100%;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      box-sizing: border-box;
+    }
+    
+    /* 确保所有元素不会超出手机容器 */
+    .phone-container * {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .phone-container {
+      width: 375px;
+      height: 812px;
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+    
+    .page-content {
+      width: 100%;
+      overflow-x: hidden;
+    }
+    
+    main {
+      overflow-x: hidden;
+      overflow-y: auto;
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+    }
+
+    nav {
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+
+    table {
+      table-layout: fixed;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    th, td {
+      word-break: break-all;
+      max-width: 80px;
+      padding: 4px 2px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-container bg-[#f8f9fa] rounded-[40px] shadow-2xl border-[8px] border-[#1a1a1a] flex flex-col">
+    <div class="px-6 py-2 flex justify-between items-center text-xs font-semibold bg-white">
+      <span>9:41</span>
+      <div class="flex items-center gap-1">
+        <iconify-icon icon="solar:signal-list-bold" width="16"></iconify-icon>
+        <iconify-icon icon="solar:wifi-router-bold" width="16"></iconify-icon>
+        <iconify-icon icon="solar:battery-charge-bold" width="18"></iconify-icon>
+      </div>
+    </div>
+    <header class="px-5 py-3.5 flex items-center justify-between bg-white border-b border-[#e9ecef]">
+      <button class="w-9 h-9 rounded-full bg-[#f0f2f5] flex items-center justify-center" onclick="goBack()">
+        <iconify-icon icon="solar:alt-arrow-left-linear" width="20" class="text-[#7f8c8d]"></iconify-icon>
+      </button>
+      <h1 class="text-lg font-bold text-[#2c3e50]" id="page-title">体检报告解读</h1>
+      <button class="w-9 h-9 rounded-full bg-[#f0f2f5] flex items-center justify-center" onclick="shareReport()">
+        <iconify-icon icon="solar:share-3-bold" width="20" class="text-[#7f8c8d]"></iconify-icon>
+      </button>
+    </header>
+    <main class="flex-1 overflow-y-auto scroll-hide pb-0">
+      <div id="page-report" class="page-content">
+        <div class="px-4 pt-4">
+          <div class="medical-card p-4 flex items-center gap-4 border-l-4 border-l-[var(--medical-green)]">
+            <div class="flex-1 min-w-0">
+              <h2 class="font-bold text-[#2c3e50] text-base">2026年度体检报告</h2>
+              <p class="text-xs text-[#95a5a6] flex items-center gap-1 mt-1">
+                <iconify-icon icon="solar:calendar-linear" width="14"></iconify-icon>
+                检查日期：2026-04-30
+              </p>
+            </div>
+            <button class="download-btn w-10 h-10 rounded-full bg-[var(--medical-green)] flex items-center justify-center text-white flex-shrink-0" onclick="downloadReport()">
+              <iconify-icon icon="solar:download-bold" width="20"></iconify-icon>
+            </button>
+          </div>
+        </div>
+        <div class="px-4 pt-3">
+          <div class="medical-card p-5 flex flex-col items-center relative overflow-hidden">
+            <div class="w-full h-40" id="gauge-chart"></div>
+            <div class="absolute top-[90px] text-center">
+              <span class="text-5xl font-extrabold text-[var(--medical-green)]" id="health-score">78</span>
+              <p class="text-xs font-medium text-[#95a5a6] mt-0.5">综合健康评分</p>
+            </div>
+            <div class="flex items-center justify-between w-full mt-2 px-2">
+              <div class="text-center flex-1">
+                <p class="text-xs text-[#95a5a6]">健康等级</p>
+                <p class="font-bold text-[#f39c12] mt-0.5">需关注</p>
+              </div>
+              <div class="w-px h-8 bg-[#e9ecef]"></div>
+              <div class="text-center flex-1">
+                <p class="text-xs text-[#95a5a6]">本次检查</p>
+                <p class="font-bold text-[#2c3e50] mt-0.5">30项</p>
+              </div>
+              <div class="w-px h-8 bg-[#e9ecef]"></div>
+              <div class="text-center flex-1">
+                <p class="text-xs text-[#95a5a6]">正常指标</p>
+                <p class="font-bold text-[var(--medical-green)] mt-0.5">22</p>
+              </div>
+              <div class="w-px h-8 bg-[#e9ecef]"></div>
+              <div class="text-center flex-1">
+                <p class="text-xs text-[#95a5a6]">异常指标</p>
+                <p class="font-bold text-[#ea580c] mt-0.5">8</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 pt-5">
+          <div class="flex items-center gap-2 mb-3 px-1">
+            <iconify-icon class="text-[var(--medical-green)]" icon="solar:wand-2-bold-duotone" width="20"></iconify-icon>
+            <h3 class="font-bold text-[#2c3e50]">AI智能分析</h3>
+          </div>
+          <div class="medical-card p-4 ai-medical-glow">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-full bg-gradient-to-br from-[#dcfce7] to-[#bbf7d0] flex-shrink-0 flex items-center justify-center mt-1">
+                <iconify-icon class="text-[var(--medical-green)]" icon="solar:star-fall-bold" width="18"></iconify-icon>
+              </div>
+              <div class="flex-1">
+                <h4 class="font-bold text-[#2c3e50] text-sm">核心结论</h4>
+                <p class="text-sm text-[#5a6c7d] leading-relaxed mt-1.5">
+                  AI分析发现你的<span class="text-[#ef4444] font-bold underline cursor-pointer" onclick="showIndicatorDetail('uric_acid')">尿酸</span>、<span class="text-[#f39c12] font-bold underline cursor-pointer" onclick="showIndicatorDetail('cholesterol')">血脂</span>和<span class="text-[#f39c12] font-bold underline cursor-pointer" onclick="showIndicatorDetail('alt')">肝功能</span>可能存在关联，指向代谢综合征风险。这在35-50岁人群中常见，与久坐和高脂高糖饮食相关。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="ai-conclusion-container"></div>
+        <div class="px-4 pt-3 pb-2">
+          <div class="bg-[#fffbeb] border border-[#fcd34d] rounded-lg p-3">
+            <div class="flex items-start gap-2">
+              <iconify-icon icon="solar:info-circle-bold" width="16" class="text-[#d97706] flex-shrink-0 mt-0.5"></iconify-icon>
+              <div class="text-xs text-[#92400e] leading-relaxed">
+                <p class="font-medium mb-1">免责声明</p>
+                <p>本内容仅供参考，不构成医疗建议。AI分析仅基于数据提供参考，不能替代医生诊断。如有疑问，请咨询医生。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="px-4 pt-2 pb-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-[#2c3e50] flex items-center gap-2">
+              <iconify-icon icon="solar:list-checks-bold" width="18"></iconify-icon>
+              指标详情
+            </h3>
+            <button class="text-xs text-[var(--medical-green)] font-medium">查看全部</button>
+          </div>
+          <div class="space-y-3" id="indicators-list"></div>
+        </div>
+      </div>
+      <div id="page-suggestions" class="page-content hidden">
+        <div class="px-4 pt-4">
+          <div class="flex items-center gap-2 mb-4">
+            <iconify-icon class="text-[var(--medical-green)]" icon="solar:target-bold" width="20"></iconify-icon>
+            <h3 class="font-bold text-[#2c3e50]">健康建议</h3>
+          </div>
+          <div class="bg-[#fffbeb] border border-[#fcd34d] rounded-lg p-3 mb-4">
+            <div class="flex items-start gap-2">
+              <iconify-icon icon="solar:info-circle-bold" width="16" class="text-[#d97706] flex-shrink-0 mt-0.5"></iconify-icon>
+              <div class="text-xs text-[#92400e] leading-relaxed">
+                <p class="font-medium mb-1">免责声明</p>
+                <p>健康建议仅供参考，不构成医疗建议。请根据自身情况调整，如有疑问请咨询医生。</p>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-3" id="suggestions-list"></div>
+        </div>
+      </div>
+      <div id="page-profile" class="page-content hidden">
+        <div class="px-4 pt-4">
+          <div class="health-gradient rounded-xl p-4 text-white">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <iconify-icon icon="solar:user-circle-bold" width="28"></iconify-icon>
+              </div>
+              <div class="flex-1">
+                <h2 class="text-base font-bold">A先生</h2>
+                <p class="text-xs opacity-80">35岁 | 男</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div class="text-center bg-white/10 rounded-lg p-2.5">
+                <p class="text-xl font-bold">78</p>
+                <p class="text-[10px] opacity-80">健康评分</p>
+              </div>
+              <div class="text-center bg-white/10 rounded-lg p-2.5">
+                <p class="text-xl font-bold">8</p>
+                <p class="text-[10px] opacity-80">异常指标</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <div class="medical-card p-3">
+              <h3 class="font-bold text-[#1e293b] text-sm mb-2.5 flex items-center gap-2">
+                <iconify-icon icon="solar:document-text-bold" width="16"></iconify-icon>
+                历史报告
+              </h3>
+              <div class="space-y-2" id="history-list"></div>
+            </div>
+          </div>
+          <div class="mt-3">
+            <div class="medical-card overflow-hidden">
+              <div class="p-3 border-b border-[#e2e8f0] flex items-center justify-between cursor-pointer" onclick="alert('设置功能')">
+                <div class="flex items-center gap-2">
+                  <iconify-icon icon="solar:settings-2-bold" width="16" class="text-[#64748b]"></iconify-icon>
+                  <span class="font-medium text-[#1e293b] text-sm">设置</span>
+                </div>
+                <iconify-icon icon="solar:chevron-right-linear" width="18" class="text-[#64748b]"></iconify-icon>
+              </div>
+              <div class="p-3 flex items-center justify-between cursor-pointer" onclick="alert('帮助功能')">
+                <div class="flex items-center gap-2">
+                  <iconify-icon icon="solar:info-circle-bold" width="16" class="text-[#64748b]"></iconify-icon>
+                  <span class="font-medium text-[#1e293b] text-sm">帮助与反馈</span>
+                </div>
+                <iconify-icon icon="solar:chevron-right-linear" width="18" class="text-[#64748b]"></iconify-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- 系统架构说明按钮 - 面试演示用 -->
+    <button class="fixed top-4 right-4 z-40 w-9 h-9 bg-white/90 rounded-full shadow-md flex items-center justify-center border border-[#e2e8f0]" onclick="openArchitectureModal()" title="查看系统架构">
+      <iconify-icon icon="solar:code-square-bold" width="18" class="text-[#059669]"></iconify-icon>
+    </button>
+    <nav class="bg-white border-t border-[#e9ecef] px-3 py-2">
+      <div class="flex justify-around">
+        <button class="flex flex-col items-center py-2 px-4 tab-active" onclick="switchPage('report')">
+          <iconify-icon icon="solar:file-text-bold" width="24"></iconify-icon>
+          <span class="text-[11px] mt-0.5 font-medium">报告</span>
+        </button>
+        <button class="flex flex-col items-center py-2 px-4 text-[#95a5a6]" onclick="switchPage('suggestions')">
+          <iconify-icon icon="solar:lightbulb-bold" width="24"></iconify-icon>
+          <span class="text-[11px] mt-0.5 font-medium">建议</span>
+        </button>
+        <button class="flex flex-col items-center py-2 px-4 text-[#95a5a6]" onclick="switchPage('profile')">
+          <iconify-icon icon="solar:user-bold" width="24"></iconify-icon>
+          <span class="text-[11px] mt-0.5 font-medium">我的</span>
+        </button>
+      </div>
+    </nav>
+    <div class="fixed bottom-24 right-4 z-[9999">
+      <button class="w-14 h-14 health-gradient rounded-full shadow-xl flex items-center justify-center text-white" onclick="openAIHelper()">
+        <iconify-icon icon="solar:chat-dots-unread-bold" width="28"></iconify-icon>
+      </button>
+    </div>
+    <div id="modal-indicator" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 modal-overlay hidden">
+      <div class="w-[375px] bg-white rounded-t-3xl px-6 py-5 modal-content max-h-[75vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-[#cbd5e1] rounded-full mx-auto mb-5"></div>
+        <div id="indicator-detail-content"></div>
+      </div>
+    </div>
+    <div id="modal-ai" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 modal-overlay hidden">
+      <div class="w-[375px] bg-white rounded-t-3xl modal-content">
+        <div class="w-10 h-1 bg-[#cbd5e1] rounded-full mx-auto mt-4"></div>
+        <div class="px-4 py-3 border-b border-[#e9ecef]">
+          <h3 class="font-bold text-[#2c3e50] flex items-center gap-2">
+            <iconify-icon icon="solar:chat-dots-unread-bold" width="20" class="text-[var(--medical-green)]"></iconify-icon>
+            AI健康助手
+          </h3>
+        </div>
+        <div class="h-56 overflow-y-auto p-3 space-y-2" id="ai-messages"></div>
+        <div class="px-4 py-3 border-t border-[#e9ecef] flex gap-2">
+          <input type="text" id="ai-input" class="flex-1 px-4 py-2 bg-[#f0f2f5] rounded-full text-sm outline-none border border-[#e9ecef]" placeholder="输入问题...">
+          <button class="px-5 py-2 health-gradient text-white rounded-full text-sm font-medium" onclick="sendAIQuestion()">发送</button>
+        </div>
+      </div>
+    </div>
+    <div id="modal-appointment" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 modal-overlay hidden">
+      <div class="w-[375px] bg-white rounded-t-3xl modal-content">
+        <div class="w-10 h-1 bg-[#cbd5e1] rounded-full mx-auto mt-4"></div>
+        <div class="px-4 py-4" id="appointment-content"></div>
+      </div>
+    </div>
+    <div id="modal-plan" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 modal-overlay hidden">
+      <div class="w-[375px] bg-white rounded-t-3xl modal-content max-h-[80vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-[#cbd5e1] rounded-full mx-auto mt-4"></div>
+        <div class="px-4 py-4" id="plan-detail-content"></div>
+      </div>
+    </div>
+    <!-- 系统架构说明弹窗 - 面试演示用 -->
+    <div id="modal-architecture" class="fixed inset-0 bg-black/40 flex items-end justify-center z-50 modal-overlay hidden">
+      <div class="w-[375px] bg-white rounded-t-3xl modal-content max-h-[85vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-[#cbd5e1] rounded-full mx-auto mt-4"></div>
+        <div class="px-5 py-4">
+          <h2 class="font-bold text-[#1e293b] text-base mb-4 flex items-center gap-2">
+            <iconify-icon icon="solar:code-square-bold" width="20" class="text-[#059669]"></iconify-icon>
+            系统架构说明
+          </h2>
+          
+          <div class="space-y-4">
+            <div class="bg-gradient-to-r from-[#f0fdf4] to-[#ecfdf5] rounded-lg p-3 border border-[#bbf7d0]">
+              <h3 class="font-bold text-[#1e293b] text-sm mb-2 flex items-center gap-1">
+                <iconify-icon icon="solar:layers-bold" width="16" class="text-[#059669]"></iconify-icon>
+                整体架构
+              </h3>
+              <p class="text-xs text-[#475569] leading-relaxed">
+                <strong>前端：</strong>HTML + CSS + JavaScript (Vanilla) + ECharts<br/>
+                <strong>后端：</strong>Node.js / Python (FastAPI)<br/>
+                <strong>大模型：</strong>OpenAI API / 通义千问 / 智谱AI
+              </p>
+            </div>
+            
+            <div class="bg-gradient-to-r from-[#eff6ff] to-[#dbeafe] rounded-lg p-3 border border-[#bfdbfe]">
+              <h3 class="font-bold text-[#1e293b] text-sm mb-2 flex items-center gap-1">
+                <iconify-icon icon="solar:document-text-bold" width="16" class="text-[#3b82f6]"></iconify-icon>
+                API 设计
+              </h3>
+              <div class="text-xs text-[#475569] space-y-1.5">
+                <p><code class="bg-white px-1.5 py-0.5 rounded border border-[#e2e8f0] text-[#3b82f6]">GET /api/report/:id</code> 获取体检报告</p>
+                <p><code class="bg-white px-1.5 py-0.5 rounded border border-[#e2e8f0] text-[#3b82f6]">POST /api/ai/analyze</code> AI 深度分析</p>
+                <p><code class="bg-white px-1.5 py-0.5 rounded border border-[#e2e8f0] text-[#3b82f6]">POST /api/ai/chat</code> AI 智能对话 (SSE)</p>
+              </div>
+            </div>
+            
+            <div class="bg-gradient-to-r from-[#fff7ed] to-[#ffedd5] rounded-lg p-3 border border-[#fed7aa]">
+              <h3 class="font-bold text-[#1e293b] text-sm mb-2 flex items-center gap-1">
+                <iconify-icon icon="solar:cpu-bold" width="16" class="text-[#ea580c]"></iconify-icon>
+                数据流向
+              </h3>
+              <div class="text-xs text-[#475569] space-y-1.5">
+                <p>1. 前端请求 → 后端 API</p>
+                <p>2. 后端 → 调用大模型 API</p>
+                <p>3. 大模型 → 流式返回 (SSE)</p>
+                <p>4. 前端 → 渲染打字机效果</p>
+              </div>
+            </div>
+            
+            <div class="bg-gradient-to-r from-[#fdf4ff] to-[#fae8ff] rounded-lg p-3 border border-[#f5d0fe]">
+              <h3 class="font-bold text-[#1e293b] text-sm mb-2 flex items-center gap-1">
+                <iconify-icon icon="solar:shield-check-bold" width="16" class="text-[#9333ea]"></iconify-icon>
+                医疗合规
+              </h3>
+              <p class="text-xs text-[#475569] leading-relaxed">
+                • 免责声明醒目展示<br/>
+                • AI 不做确诊性结论<br/>
+                • 所有建议标注「仅供参考」
+              </p>
+            </div>
+            
+            <div class="text-center">
+              <button class="w-full py-2.5 health-gradient text-white rounded-lg text-sm font-medium" onclick="closeArchitectureModal()">
+                了解了
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
